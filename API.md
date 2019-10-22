@@ -93,7 +93,7 @@ Second, the value is validated against the defined schema:
 const { error, value } = schema.validate({ a: 'a string' });
 ```
 
-If the input is valid, then the `error` will be `null`. If the input is invalid, `error` is assigned
+If the input is valid, then the `error` will be `undefined`. If the input is invalid, `error` is assigned
 a [`ValidationError`](https://github.com/hapijs/joi/blob/master/API.md#validationerror) object
 providing more information.
 
@@ -724,24 +724,22 @@ schema.validate(''); // returns { error: "value" is not allowed to be empty, val
 Overrides the default **joi** error with a custom error if the rule fails where:
 - `err` can be:
   - an instance of `Error` - the override error.
-  - a function with the signature `function(errors)`, where `errors` is an array of validation
-    reports and it returns either a single `Error` or an array of validation reports.
+  - a function with the signature `function(errors)`, where `errors` is an array of validation reports and it returns either a single `Error` or an array of validation reports.
 
-Note that if you provide an `Error`, it will be returned as-is, unmodified and undecorated with any
-of the normal error properties. If validation fails and another error is found before the error
-override, that error will be returned and the override will be ignored (unless the `abortEarly`
-option has been set to `false`).
+Do not use this method if you are simply trying to override the error message - use `any.message()` or `any.messages()` instead. This method is designed to override the **joi** validation error and return the exact override provided. It is useful when you want to return the result of validation directly (e.g. when using with a **hapi** server) and want to return a different HTTP error code than 400.
+
+Note that if you provide an `Error`, it will be returned as-is, unmodified and undecorated with any of the normal error properties. If validation fails and another error is found before the error override, that error will be returned and the override will be ignored (unless the `abortEarly` option has been set to `false`). If you set multiple errors on a single schema, only the last error is used.
 
 ```js
 const schema = Joi.string().error(new Error('Was REALLY expecting a string'));
-schema.validate(3);     // returns error.message === 'Was REALLY expecting a string'
+schema.validate(3);     // returns Error('Was REALLY expecting a string')
 ```
 
 ```js
 const schema = Joi.object({
     foo: Joi.number().min(0).error((errors) => new Error('"foo" requires a positive number'))
 });
-schema.validate({ foo: -2 });    // returns error.message === '"foo" requires a positive number'
+schema.validate({ foo: -2 });    // returns new Error('"foo" requires a positive number')
 ```
 
 ```js
@@ -751,7 +749,7 @@ const schema = Joi.object({
         return new Error('found errors with ' + errors.map((err) => `${err.type}(${err.local.limit}) with value ${err.local.value}`).join(' and '));
     })
 });
-schema.validate({ foo: -2 });    // returns error.message === 'child "foo" fails because [found errors with number.min(0) with value -2]'
+schema.validate({ foo: -2 });    // returns new Error('child "foo" fails because [found errors with number.min(0) with value -2]')
 ```
 
 #### `any.example(example, [options])`
@@ -1839,6 +1837,7 @@ Specifies that the value must be less than `date` (or a reference).
 
 ```js
 const schema = Joi.date().less('12-31-2020');
+```
 
 Notes: `'now'` can be passed in lieu of `date` so as to always compare relatively to the current date, allowing to explicitly ensure a date is either in the past or in the future.
 
@@ -2221,8 +2220,7 @@ Possible validation errors: [`number.unsafe`](#numberunsafe)
 
 ### `object`
 
-Generates a schema object that matches an object data type (as well as JSON strings that parsed into objects). Defaults
-to allowing any child key.
+Generates a schema object that matches an object data type. Defaults to allowing any child key.
 
 Supports the same methods of the [`any()`](#any) type.
 
@@ -2418,8 +2416,7 @@ Possible validation errors: [`object.oxor`](#objectoxor)
 #### `object.pattern(pattern, schema, [options])`
 
 Specify validation rules for unknown keys matching a pattern where:
-- `pattern` - a pattern that can be either a regular expression or a **joi** schema that will be
-  tested against the unknown key names.
+- `pattern` - a pattern that can be either a regular expression or a **joi** schema that will be tested against the unknown key names. Note that if the pattern is a regular expression, for it to match the entire key name, it must begin with `^` and end with `$`.
 - `schema` - the schema object matching keys must validate against.
 - `options` - options settings:
     - `fallthrough` - if `true`, multiple matching patterns are tested against the key, otherwise once a pattern match is found, no other patterns are compared. Defaults to `false`.
@@ -2933,7 +2930,7 @@ Possible validation errors: [`string.normalize`](#stringnormalize)
 #### `string.pattern(regex, [name | options])` - aliases: `regex`
 
 Defines a pattern rule where:
-- `regex` - a regular expression object the string value must match against.
+- `regex` - a regular expression object the string value must match against. Note that if the pattern is a regular expression, for it to match the entire key name, it must begin with `^` and end with `$`.
 - `name` - optional name for patterns (useful with multiple patterns).
 - `options` - an optional configuration object with the following supported properties:
   - `name` - optional pattern name.
@@ -3105,7 +3102,7 @@ const custom = Joi.extend((joi) => {
                 return { value: Math.round(value) };
             }
         },
-        validate(schema, value, helpers) {
+        validate(value, helpers) {
 
             // Base validation regardless of the rules applied
 
@@ -3924,7 +3921,7 @@ Additional local context properties:
     message: string, // The combined error messages
     matches: Array<string>  // The matching keys
 }
-``
+```
 
 #### `object.refType`
 
